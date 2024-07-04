@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { PrismaClient } from '@prisma/client/edge'
 import { withAccelerate } from '@prisma/extension-accelerate'
-import { jwt,verify } from "hono/jwt";
+import { jwt, verify } from "hono/jwt";
 import { createBlogInput, updateBloginput } from "@sharmaji_09/common";
 
 
@@ -11,7 +11,7 @@ const blogRouter = new Hono<{
         JWT_SECRET_KEY: string
         userId: string
     },
-    Variables:{
+    Variables: {
         userId: String;
     }
 }>();
@@ -20,7 +20,7 @@ blogRouter.use("/*", async (c, next) => {
     const authHeader = c.req.header("authorization") || "";
     const check = await verify(authHeader, c.env.JWT_SECRET_KEY);
     if (check) {
-        c.set("jwtPayload", check.id); 
+        c.set("jwtPayload", check.id);
         await next();
     } else {
         c.status(403);
@@ -29,7 +29,7 @@ blogRouter.use("/*", async (c, next) => {
         });
     }
 });
-blogRouter.post('/', async(c) => {
+blogRouter.post('/', async (c) => {
     const prisma = new PrismaClient({
         datasourceUrl: c.env.DATABASE_URL,
     }).$extends(withAccelerate())
@@ -92,12 +92,23 @@ blogRouter.put('/', async (c) => {
 })
 
 //TODO: add pagination
-blogRouter.get('/bulk', async(c) => {
+blogRouter.get('/bulk', async (c) => {
     const prisma = new PrismaClient({
         datasourceUrl: c.env.DATABASE_URL,
     }).$extends(withAccelerate())
-   
-    const blogs = await prisma.blog.findMany({})
+
+    const blogs = await prisma.blog.findMany({
+        select: {
+            title: true,
+            content: true,
+            id: true,
+            author: {
+                select: {
+                    name: true,
+                }
+            }
+        }
+    })
 
     return c.json({
         blogs
@@ -108,20 +119,30 @@ blogRouter.get('/:id', async (c) => {
     const prisma = new PrismaClient({
         datasourceUrl: c.env.DATABASE_URL,
     }).$extends(withAccelerate())
-   
-    const id  = c.req.param("id")
+
+    const id = c.req.param("id")
     const blog = await prisma.blog.findFirst({
-        where:{
+        where: {
             id: Number(id)
+        },
+        select:{
+            id: true,
+            authorId: true,
+            title: true,
+            content: true,
+            published: true,
+            author:{
+                select: {
+                    name: true
+                }
+            }
         }
     })
 
     return c.json({
-        blog
+        blog 
     })
 })
-
-
 export default blogRouter;
 
 
